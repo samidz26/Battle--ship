@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAMI BATTLESHIP — حرب السفن</title>
+<style>
+/* ============ الأساسيات ============ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --blue: #38b6ff;
+  --blue-dark: #0a3d62;
+  --red: #ff4757;
+  --red-dark: #6b1420;
+  --gold: #ffd700;
+  --bg: #05070d;
+  --bg2: #0d1220;
+  --text: #e8eef7;
+  --muted: #7a8aa3;
+}
+html, body {
+  height: 100%;
+  background: radial-gradient(ellipse at top, #0a1428 0%, #05070d 60%);
+  color: var(--text);
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+body { display: flex; flex-direction: column; }
+
+/* ============ الشاشات ============ */
+.screen {
+  position: absolute; inset: 0;
+  display: none;
+  flex-direction: column;
+  padding: 16px;
+  overflow-y: auto;
+}
+.screen.active { display: flex; }
+
+/* ============ شاشة الاتصال ============ */
+#screen-connect {
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+.logo {
+  font-size: 56px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  background: linear-gradient(135deg, var(--blue), var(--gold), var(--red));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-align: center;
+  text-shadow: 0 0 40px rgba(56,182,255,.3);
+}
+.logo small {
+  display: block;
+  font-size: 16px;
+  letter-spacing: 8px;
+  color: var(--muted);
+  -webkit-text-fill-color: var(--muted);
+  margin-top: 8px;
+}
+.connect-box {
+  background: rgba(13,18,32,.85);
+  border: 1px solid rgba(56,182,255,.25);
+  border-radius: 16px;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 340px;
+  box-shadow: 0 0 60px rgba(56,182,255,.1);
+}
+.connect-box h2 { font-size: 18px; color: var(--muted); text-align: center; font-weight: 500; }
+input[type="text"], input[type="number"] {
+  background: #05070d;
+  border: 1px solid rgba(122,138,163,.3);
+  color: var(--text);
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 16px;
+  outline: none;
+  transition: .2s;
+  text-align: center;
+}
+input:focus { border-color: var(--blue); box-shadow: 0 0 20px rgba(56,182,255,.25); }
+
+button {
+  background: linear-gradient(135deg, var(--blue), #1e90ff);
+  color: #fff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: .2s;
+  font-family: inherit;
+}
+button:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(56,182,255,.35); }
+button:active { transform: translateY(0); }
+button.danger { background: linear-gradient(135deg, var(--red), #c0392b); }
+button.gold { background: linear-gradient(135deg, var(--gold), #d4a017); color: #000; }
+button.ghost { background: transparent; border: 1px solid rgba(122,138,163,.4); }
+button:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+/* ============ لوحة اللعبة الرئيسية ============ */
+#screen-game { gap: 12px; padding: 12px; }
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(13,18,32,.7);
+  border: 1px solid rgba(122,138,163,.15);
+  border-radius: 12px;
+  padding: 10px 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.turn-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 10px;
+  transition: .3s;
+}
+.turn-indicator.blue { background: rgba(56,182,255,.15); border: 1px solid var(--blue); color: var(--blue); box-shadow: 0 0 20px rgba(56,182,255,.2); }
+.turn-indicator.red { background: rgba(255,71,87,.15); border: 1px solid var(--red); color: var(--red); box-shadow: 0 0 20px rgba(255,71,87,.2); }
+.turn-pulse { width: 12px; height: 12px; border-radius: 50%; background: currentColor; animation: pulse 1.4s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(1.4); } }
+
+.team-stats { display: flex; gap: 18px; font-size: 14px; color: var(--muted); }
+.team-stats b { color: var(--text); }
+
+/* ============ منطقة اللوحات ============ */
+.boards-container {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 16px;
+  align-items: center;
+  min-height: 0;
+}
+@media (max-width: 900px) {
+  .boards-container { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
+}
+
+.board-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+.board-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.board-title.blue { color: var(--blue); }
+.board-title.red { color: var(--red); }
+.board-title .count { font-size: 13px; color: var(--muted); font-weight: 500; }
+
+.board {
+  display: grid;
+  gap: 3px;
+  background: rgba(13,18,32,.6);
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(122,138,163,.2);
+  transition: .4s;
+}
+.board.enemy { border-color: rgba(255,71,87,.4); box-shadow: 0 0 30px rgba(255,71,87,.15); }
+.board.own { border-color: rgba(56,182,255,.4); box-shadow: 0 0 30px rgba(56,182,255,.15); }
+.board.active { border-color: var(--gold); box-shadow: 0 0 40px rgba(255,215,0,.3); }
+
+.cell {
+  width: 34px; height: 34px;
+  background: rgba(56,182,255,.08);
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--muted);
+  transition: .3s;
+  position: relative;
+  cursor: default;
+}
+.cell.coord-header { background: transparent; font-weight: 700; color: var(--muted); font-size: 11px; }
+.cell.ship-blue { background: rgba(56,182,255,.35); border: 1px solid rgba(56,182,255,.6); }
+.cell.ship-red { background: rgba(255,71,87,.35); border: 1px solid rgba(255,71,87,.6); }
+.cell.hit { background: rgba(255,71,87,.7) !important; color: #fff; font-size: 20px; animation: hitAnim .5s; }
+.cell.hit::after { content: '💥'; }
+.cell.miss { background: rgba(122,138,163,.35) !important; color: #fff; font-size: 20px; }
+.cell.miss::after { content: '💧'; }
+.cell.sunk { background: #2a0a0a !important; border: 1px solid #ff4757; }
+.cell.sunk::after { content: '🔥'; font-size: 20px; }
+@keyframes hitAnim {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.4); background: #fff; }
+  100% { transform: scale(1); }
+}
+
+/* ============ الوسط (VS + آخر حدث) ============ */
+.center-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: 140px;
+}
+.vs-badge {
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--gold);
+  text-shadow: 0 0 20px rgba(255,215,0,.5);
+}
+.last-event {
+  background: rgba(13,18,32,.8);
+  border: 1px solid rgba(122,138,163,.2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  text-align: center;
+  font-size: 13px;
+  min-width: 160px;
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+.last-event .who { color: var(--gold); font-weight: 700; }
+.last-event .what { color: var(--muted); }
+.last-event .coord { color: var(--text); font-weight: 700; font-size: 16px; letter-spacing: 1px; }
+
+/* ============ سجل الأحداث ============ */
+.event-log {
+  background: rgba(13,18,32,.6);
+  border: 1px solid rgba(122,138,163,.15);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  max-height: 100px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.event-log .entry { display: flex; gap: 8px; align-items: center; opacity: .9; }
+.event-log .entry .name { color: var(--gold); font-weight: 600; min-width: 80px; }
+.event-log .entry .res.hit { color: var(--red); }
+.event-log .entry .res.miss { color: var(--muted); }
+
+/* ============ لوحة المضيف ============ */
+.host-panel {
+  position: fixed;
+  top: 0; left: 0;
+  width: 360px;
+  max-width: 90vw;
+  height: 100%;
+  background: rgba(5,7,13,.97);
+  border-right: 1px solid rgba(56,182,255,.25);
+  padding: 20px;
+  overflow-y: auto;
+  transform: translateX(-100%);
+  transition: .35s cubic-bezier(.4,0,.2,1);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.host-panel.open { transform: translateX(0); }
+.host-toggle {
+  position: fixed;
+  top: 12px; left: 12px;
+  z-index: 101;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: rgba(13,18,32,.9);
+  border: 1px solid rgba(56,182,255,.4);
+  color: var(--blue);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: .2s;
+}
+.host-toggle:hover { background: var(--blue); color: #fff; }
+.host-section {
+  background: rgba(13,18,32,.6);
+  border: 1px solid rgba(122,138,163,.15);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.host-section h3 { font-size: 14px; color: var(--blue); letter-spacing: 1px; }
+.host-section label { font-size: 12px; color: var(--muted); }
+.host-section .row { display: flex; gap: 8px; align-items: center; }
+.host-section .row input[type="number"] { width: 80px; }
+
+.ship-config-row {
+  display: grid;
+  grid-template-columns: 1fr 60px 60px 30px;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+.ship-config-row input { padding: 6px 8px; font-size: 13px; }
+.ship-config-row button { padding: 4px 8px; font-size: 14px; background: rgba(255,71,87,.2); border: 1px solid var(--red); }
+
+.host-log {
+  font-size: 11px;
+  color: var(--muted);
+  background: #05070d;
+  border-radius: 8px;
+  padding: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+  font-family: monospace;
+}
+
+/* ============ شاشة الفوز ============ */
+#winner-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.92);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 24px;
+  gap: 20px;
+}
+#winner-overlay.show { display: flex; animation: fadeIn .5s; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.winner-title {
+  font-size: 64px;
+  font-weight: 900;
+  letter-spacing: 6px;
+  animation: winnerPop .8s cubic-bezier(.2,1.5,.4,1);
+}
+.winner-title.blue { color: var(--blue); text-shadow: 0 0 60px var(--blue); }
+.winner-title.red { color: var(--red); text-shadow: 0 0 60px var(--red); }
+@keyframes winnerPop { 0% { transform: scale(0) rotate(-15deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+.winner-subtitle { font-size: 22px; color: var(--gold); }
+.winner-stats { display: flex; gap: 32px; font-size: 16px; color: var(--muted); }
+.winner-stats b { color: var(--text); font-size: 24px; display: block; text-align: center; }
+.winner-ships { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; max-width: 80vw; }
+.winner-ships .ship-tag { background: rgba(122,138,163,.2); padding: 6px 12px; border-radius: 8px; font-size: 13px; }
+
+/* ============ Canvas الجسيمات ============ */
+#particles-canvas {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 150;
+}
+
+/* ============ إشعار Toast ============ */
+#toast {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: rgba(13,18,32,.95);
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  padding: 10px 22px;
+  border-radius: 10px;
+  font-weight: 700;
+  z-index: 300;
+  opacity: 0;
+  transition: .3s;
+  pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ============ اهتزاز الشاشة ============ */
+@keyframes shake {
+  0%,100% { transform: translate(0,0); }
+  20% { transform: translate(-6px, 4px); }
+  40% { transform: translate(6px, -4px); }
+  60% { transform: translate(-4px, -4px); }
+  80% { transform: translate(4px, 4px); }
+}
+.shake { animation: shake .35s; }
+
+/* ============ شارة العدّاد (للمتابعين) ============ */
+.hint-bar {
+  background: rgba(255,215,0,.08);
+  border: 1px solid rgba(255,215,0,.3);
+  color: var(--gold);
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  text-align: center;
+  font-weight: 600;
+}
+</style>
+</head>
+<body>
+
+<!-- ============ شاشة الاتصال ============ -->
+<div id="screen-connect" class="screen active">
+  <div class="logo">
+    ⚓ SAMI BATTLESHIP
+    <small>حرب السفن الجماعية</small>
+  </div>
+  <div class="connect-box">
+    <h2>🎬 ربط بث تيك توك لايف</h2>
+    <input type="text" id="tiktok-username" placeholder="أدخل اسم حساب البث..." />
+    <button id="btn-connect">🔗 اتصال بالبث</button>
+    <div id="connect-status" style="text-align:center;font-size:13px;color:var(--muted);"></div>
+  </div>
+</div>
+
+<!-- ============ شاشة اللعبة ============ -->
+<div id="screen-game" class="screen">
+  <div class="topbar">
+    <div class="turn-indicator blue" id="turn-indicator">
+      <span class="turn-pulse"></span>
+      <span id="turn-text">دور الفريق الأزرق</span>
+    </div>
+    <div class="team-stats">
+      <span>🔵 <b id="stat-blue-ships">-</b> سفن</span>
+      <span>🔴 <b id="stat-red-ships">-</b> سفن</span>
+      <span>👥 <b id="stat-blue-players">0</b> / <b id="stat-red-players">0</b></span>
+    </div>
+  </div>
+
+  <div class="hint-bar" id="hint-bar">📝 اكتب 1 للانضمام للفريق الأزرق، أو 2 للفريق الأحمر</div>
+
+  <div class="boards-container">
+    <!-- لوحة الفريق الأزرق -->
+    <div class="board-wrapper">
+      <div class="board-title blue">🔵 الفريق الأزرق <span class="count" id="blue-ship-count"></span></div>
+      <div class="board" id="board-blue"></div>
+    </div>
+
+    <!-- الوسط -->
+    <div class="center-panel">
+      <div class="vs-badge">⚔️</div>
+      <div class="last-event" id="last-event">
+        <div class="what">في انتظار بدء اللعبة...</div>
+      </div>
+    </div>
+
+    <!-- لوحة الفريق الأحمر -->
+    <div class="board-wrapper">
+      <div class="board-title red">🔴 الفريق الأحمر <span class="count" id="red-ship-count"></span></div>
+      <div class="board" id="board-red"></div>
+    </div>
+  </div>
+
+  <div class="event-log" id="event-log"></div>
+</div>
+
+<!-- ============ لوحة المضيف ============ -->
+<button class="host-toggle" id="host-toggle">⚙️</button>
+<div class="host-panel" id="host-panel">
+  <h2 style="color:var(--gold);">⚙️ لوحة المضيف</h2>
+
+  <div class="host-section">
+    <h3>📐 إعدادات اللوحة</h3>
+    <div class="row">
+      <label>حجم اللوحة:</label>
+      <input type="number" id="cfg-board-size" min="5" max="20" value="10" />
+    </div>
+  </div>
+
+  <div class="host-section">
+    <h3>🚢 إعدادات السفن</h3>
+    <div id="ships-config"></div>
+    <button class="ghost" id="btn-add-ship" style="font-size:12px;padding:6px;">+ إضافة نوع سفينة</button>
+    <button class="gold" id="btn-save-config" style="font-size:13px;">💾 حفظ الإعدادات</button>
+  </div>
+
+  <div class="host-section">
+    <h3>🎮 التحكم</h3>
+    <button id="btn-toggle-reg" class="gold">🔴 فتح التسجيل</button>
+    <button id="btn-start-game" disabled>🚀 بدء اللعبة</button>
+    <button class="danger" id="btn-reset">🔄 إعادة تعيين</button>
+  </div>
+
+  <div class="host-section">
+    <h3>✋ تدخل يدوي</h3>
+    <div class="row">
+      <input type="text" id="host-coord" placeholder="A1" style="flex:1;" />
+      <button id="btn-host-fire">🎯 إطلاق</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);">يُطلق نيابة عن الفريق صاحب الدور</div>
+  </div>
+
+  <div class="host-section">
+    <h3>📋 سجل المضيف</h3>
+    <div class="host-log" id="host-log"></div>
+  </div>
+</div>
+
+<!-- ============ شاشة الفوز ============ -->
+<div id="winner-overlay">
+  <div class="winner-title" id="winner-title">🏆</div>
+  <div class="winner-subtitle" id="winner-subtitle">أبطال حرب السفن</div>
+  <div class="winner-stats" id="winner-stats"></div>
+  <div class="winner-ships" id="winner-ships"></div>
+  <button class="gold" id="btn-replay" style="padding:14px 32px;font-size:18px;">🚀 إعادة اللعب</button>
+</div>
+
+<!-- ============ Canvas الجسيمات ============ -->
+<canvas id="particles-canvas"></canvas>
+
+<!-- ============ Toast ============ -->
+<div id="toast"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+/* ============================================================
+   1. Web Audio API — مولّد الأصوات
+   ============================================================ */
+const Audio = (() => {
+  let ctx = null;
+  function ensure() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  function tone({ freq = 440, dur = 0.15, type = 'sine', gain = 0.15, sweep = null }) {
+    const c = ensure();
+    const osc = c.createOscillator();
+    const g = c.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, c.currentTime);
+    if (sweep) osc.frequency.exponentialRampToValueAtTime(sweep, c.currentTime + dur);
+    g.gain.setValueAtTime(gain, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+    osc.connect(g); g.connect(c.destination);
+    osc.start(); osc.stop(c.currentTime + dur);
+  }
+  return {
+    click()  { tone({ freq: 600, dur: 0.06, type: 'square', gain: 0.08 }); },
+    hit()    {
+      // انفجار: ضربة + ضجيج
+      tone({ freq: 120, dur: 0.4, type: 'sawtooth', gain: 0.25, sweep: 40 });
+      tone({ freq: 240, dur: 0.3, type: 'square', gain: 0.12, sweep: 60 });
+      noise(0.25, 0.15);
+    },
+    miss()   {
+      // سقوط في الماء
+      tone({ freq: 800, dur: 0.25, type: 'sine', gain: 0.1, sweep: 200 });
+    },
+    sunk()   {
+      tone({ freq: 150, dur: 0.8, type: 'sawtooth', gain: 0.3, sweep: 30 });
+      tone({ freq: 80, dur: 1.0, type: 'sine', gain: 0.25, sweep: 20 });
+      noise(0.5, 0.2);
+    },
+    join()   {
+      tone({ freq: 523, dur: 0.1, type: 'sine', gain: 0.15 });
+      setTimeout(() => tone({ freq: 784, dur: 0.15, type: 'sine', gain: 0.15 }), 90);
+    },
+    turn()   {
+      tone({ freq: 440, dur: 0.12, type: 'triangle', gain: 0.12 });
+      setTimeout(() => tone({ freq: 660, dur: 0.18, type: 'triangle', gain: 0.12 }), 100);
+    },
+    win()    {
+      [523, 659, 784, 1046].forEach((f, i) => {
+        setTimeout(() => tone({ freq: f, dur: 0.35, type: 'triangle', gain: 0.22 }), i * 140);
+      });
+    },
+    error()  {
+      tone({ freq: 200, dur: 0.15, type: 'square', gain: 0.1 });
+    }
+  };
+  function noise(dur, gain) {
+    const c = ensure();
+    const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    const g = c.createGain();
+    g.gain.setValueAtTime(gain, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+    const filter = c.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 800;
+    src.connect(filter); filter.connect(g); g.connect(c.destination);
+    src.start();
+  }
+})();
+
+/* ============================================================
+   2. نظام الجسيمات (Canvas)
+   ============================================================ */
+const Particles = (() => {
+  const canvas = document.getElementById('particles-canvas');
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  let rafId = null;
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function burst(x, y, color = '#ff4757', count = 40) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 2 + Math.random() * 6;
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1,
+        decay: 0.015 + Math.random() * 0.02,
+        size: 2 + Math.random() * 4,
+        color: color,
+        trail: []
+      });
+    }
+    start();
+  }
+
+  function start() {
+    if (rafId) return;
+    loop();
+  }
+
+  function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    particles = particles.filter(p => p.life > 0);
+
+    for (const p of particles) {
+      p.trail.push({ x: p.x, y: p.y });
+      if (p.trail.length > 5) p.trail.shift();
+
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.15; // جاذبية
+      p.vx *= 0.99;
+      p.life -= p.decay;
+
+      // رسم الأثر
+      ctx.globalAlpha = p.life * 0.3;
+      ctx.fillStyle = p.color;
+      for (let i = 0; i < p.trail.length; i++) {
+        const t = p.trail[i];
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, p.size * (i / p.trail.length), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // رسم الجسيم
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.globalAlpha = 1;
+
+    if (particles.length > 0) {
+      rafId = requestAnimationFrame(loop);
+    } else {
+      rafId = null;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  return { burst };
+})();
+
+/* ============================================================
+   3. أدوات مساعدة
+   ============================================================ */
+function $(sel) { return document.querySelector(sel); }
+function $$(sel) { return document.querySelectorAll(sel); }
+
+function toast(msg, dur = 2200) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), dur);
+}
+
+function shakeScreen() {
+  document.body.classList.add('shake');
+  setTimeout(() => document.body.classList.remove('shake'), 400);
+}
+
+function getCellCenter(row, col, boardId) {
+  const board = document.getElementById(boardId);
+  if (!board) return null;
+  const rect = board.getBoundingClientRect();
+  const cellSize = 34 + 3; // حجم + gap
+  const padding = 8;
+  // الأعمدة تبدأ بعد عمود الإحداثيات
+  const x = rect.left + padding + (col + 1) * cellSize + cellSize / 2;
+  const y = rect.top + padding + (row + 1) * cellSize + cellSize / 2;
+  return { x, y };
+}
+
+/* ============================================================
+   4. حالة العميل
+   ============================================================ */
+const state = {
+  boardSize: 10,
+  teamNames: { 1: 'الأزرق', 2: 'الأحمر' },
+  currentTurn: 1,
+  phase: 'setup',
+  boards: { 1: null, 2: null },
+  stats: { 1: { hits: 0, misses: 0, sunk: 0 }, 2: { hits: 0, misses: 0, sunk: 0 } },
+  teamCounts: { 1: 0, 2: 0 },
+  registrationOpen: false,
+  revealedShips: null // تُعرض بعد الفوز
+};
+
+const socket = io();
+
+/* ============================================================
+   5. شاشة الاتصال
+   ============================================================ */
+$('#btn-connect').addEventListener('click', () => {
+  const username = $('#tiktok-username').value.trim();
+  if (!username) return toast('أدخل اسم الحساب');
+  $('#connect-status').textContent = '⏳ جاري الاتصال...';
+  Audio.click();
+  socket.emit('connect_tiktok', { username });
+});
+
+socket.on('tiktok_connected', ({ username }) => {
+  $('#connect-status').textContent = '✅ متصل: ' + username;
+  setTimeout(() => {
+    $('#screen-connect').classList.remove('active');
+    $('#screen-game').classList.add('active');
+    toast('✅ تم الاتصال بنجاح');
+  }, 600);
+});
+
+socket.on('tiktok_error', (msg) => {
+  $('#connect-status').textContent = '❌ ' + msg;
+  Audio.error();
+  toast('خطأ: ' + msg);
+});
+
+/* ============================================================
+   6. بناء اللوحات
+   ============================================================ */
+function buildBoard(boardId, team) {
+  const board = document.getElementById(boardId);
+  board.innerHTML = '';
+  const size = state.boardSize;
+  const cellSize = size > 12 ? 28 : 34;
+  board.style.gridTemplateColumns = `repeat(${size + 1}, ${cellSize}px)`;
+
+  // صف الرأس (أحرف)
+  board.appendChild(makeCell('', 'coord-header'));
+  for (let c = 0; c < size; c++) {
+    board.appendChild(makeCell(String.fromCharCode(65 + c), 'coord-header'));
+  }
+
+  // الصفوف
+  for (let r = 0; r < size; r++) {
+    board.appendChild(makeCell(r + 1, 'coord-header'));
+    for (let c = 0; c < size; c++) {
+      const cell = makeCell('', '');
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+      cell.dataset.team = team;
+      cell.style.width = cellSize + 'px';
+      cell.style.height = cellSize + 'px';
+      cell.id = `cell-${team}-${r}-${c}`;
+      board.appendChild(cell);
+    }
