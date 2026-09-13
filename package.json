@@ -1,0 +1,14 @@
+{
+  "name": "sami-battleship",
+  "version": "1.0.0",
+  "description": "حرب السفن الجماعية على TikTok LIVE",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "tiktok-live-connector": "^2.4.3"
+  }
+}
